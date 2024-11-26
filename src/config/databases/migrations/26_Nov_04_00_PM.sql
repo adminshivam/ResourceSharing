@@ -1,0 +1,21 @@
+CREATE DATABASE resource_sharing;
+
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    login_token VARCHAR(255) UNIQUE NOT NULL,
+);
+
+CREATE TABLE resources (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    resource_url TEXT NOT NULL,
+    expiration_time DATETIME NOT NULL,
+    is_expired BOOLEAN DEFAULT FALSE,
+    access_token VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
