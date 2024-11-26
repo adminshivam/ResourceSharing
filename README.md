@@ -28,14 +28,6 @@ cd resource-sharing
 Install dependencies:
 
 npm install
-Configure environment variables in .env:
-
-DB_HOST=localhost
-DB_NAME=resource_sharing
-DB_USER=root
-DB_PASSWORD=your_password
-JWT_SECRET=your_secret_key
-PORT=3000
 
 Set up the database schema. Run the following MySQL commands:
 
@@ -47,6 +39,7 @@ CREATE TABLE users (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    login_token VARCHAR(255) UNIQUE NOT NULL,
 );
 
 CREATE TABLE resources (
@@ -57,57 +50,86 @@ CREATE TABLE resources (
     is_expired BOOLEAN DEFAULT FALSE,
     access_token VARCHAR(255) UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 # **Start the server:**
 
+npm run start 
 node app.js
 The API server will be running on http://localhost:3000.
 
 # **API Documentation**
 
-1. Create a New Resource
+1. Create a New User
+Endpoint: POST /users
+
+Description: Creates a resource with an expiration time.
+curl --location 'http://localhost:3000/users' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "name": "test",
+    "email": "test@local.com"
+}'
+
+Response:
+
+{
+    "userId": 1,
+    "access_token": "g3hqngmitqg"
+}
+
+2. Create a New Resource
 Endpoint: POST /resources
 
 Description: Creates a resource with an expiration time.
 
-Request Body:
+Curl:
 
-{
-  "user_id": 1,
-  "resource_url": "http://example.com/file.pdf",
-  "expiration_time": "2024-12-01 12:00:00"
-}
+curl --location 'http://localhost:3000/resources' \
+--header 'Content-Type: application/json' \
+--header 'user-id: 1' \
+--header 'access-token: g3hqngmitqg' \
+--data '{
+    "resourceUrl": "http://example.com/file.pdf",
+    "expirationTime": "2024-11-28 04:47:00"
+}'
+
 Response:
 
 {
-  "id": 1,
-  "access_token": "unique-token-here"
+    "resourceId": 1,
+    "resourceAccessToken": "3geck6nsm3g"
 }
+
 
 2. Fetch Resources
 Endpoint: GET /resources
 
 Description: Fetch resources for a user with optional filters for status.
 
-Query Parameters:
+Curl:
 
-user_id (required): ID of the user.
-status (optional): active or expired.
+curl --location 'http://localhost:3000/resources?status=active' \
+--header 'user-id: 1' \
+--header 'access-token: g3hqngmitqg'
 
 Response:
 
-[
-  {
-    "id": 1,
-    "user_id": 1,
-    "resource_url": "http://example.com/file.pdf",
-    "expiration_time": "2024-12-01T12:00:00.000Z",
-    "is_expired": false,
-    "access_token": "unique-token-here"
-  }
-]
+{
+    "resources": [
+        {
+            "id": 1,
+            "user_id": 1,
+            "resource_url": "http://example.com/file.pdf",
+            "expiration_time": "2024-11-27T23:17:00.000Z",
+            "is_expired": 0,
+            "access_token": "3geck6nsm3g",
+            "created_at": "2024-11-26T07:55:31.000Z"
+        }
+    ]
+}
 
 3. Access a Specific Resource
 
@@ -115,23 +137,25 @@ Endpoint: GET /resources/:id
 
 Description: Fetch a specific resource if it is still active.
 
-Headers:
+Curl:
 
-access_token: Token for secure access.
+curl --location 'http://localhost:3000/resources/1' \
+--header 'access-token: 3geck6nsm3g'
+
 Response:
 
 {
-  "id": 1,
-  "user_id": 1,
-  "resource_url": "http://example.com/file.pdf",
-  "expiration_time": "2024-12-01T12:00:00.000Z",
-  "is_expired": false,
-  "access_token": "unique-token-here"
-}
-Error (Expired or Invalid):
-
-{
-  "message": "Resource is expired or invalid."
+    "resources": [
+        {
+            "id": 1,
+            "user_id": 1,
+            "resource_url": "http://example.com/file.pdf",
+            "expiration_time": "2024-11-27T23:17:00.000Z",
+            "is_expired": 0,
+            "access_token": "3geck6nsm3g",
+            "created_at": "2024-11-26T07:55:31.000Z"
+        }
+    ]
 }
 
 4. Delete a Resource
@@ -139,47 +163,22 @@ Endpoint: DELETE /resources/:id
 
 Description: Delete a resource if the user is the owner.
 
-Request Body:
+Curl:
 
-{
-  "user_id": 1
-}
+curl --location --request DELETE 'http://localhost:3000/resources/1' \
+--header 'user-id: 1' \
+--header 'access-token: g3hqngmitqg'
+
 Response:
 
 {
-  "message": "Resource deleted successfully."
-}
-Error (Unauthorized):
-
-{
-  "message": "Unauthorized to delete this resource."
+    "data": {
+        "message": "Deleted resource 1 successfully"
+    }
 }
 
 Auto-Expiry Cron Job
 The cron job checks for expired resources every minute and flags them as expired in the database. This ensures no active resources remain accessible past their expiration time.
-
-Testing
-You can use tools like Postman or cURL to test the API endpoints.
-
-Example Requests:
-
-Create Resource:
-
-curl -X POST http://localhost:3000/resources \
--H "Content-Type: application/json" \
--d '{"user_id": 1, "resource_url": "http://example.com/file.pdf", "expiration_time": "2024-12-01 12:00:00"}'
-Fetch Active Resources:
-
-curl -X GET "http://localhost:3000/resources?user_id=1&status=active"
-Access Resource:
-
-curl -X GET http://localhost:3000/resources/1 \
--H "access_token: your_generated_token"
-Delete Resource:
-
-curl -X DELETE http://localhost:3000/resources/1 \
--H "Content-Type: application/json" \
--d '{"user_id": 1}'
 
 Future Improvements
 Implement user authentication with JWT.
